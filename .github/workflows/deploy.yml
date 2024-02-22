@@ -1,4 +1,4 @@
-name: Deploy damap
+name: Deploy DAMAP
 
 on:
   push: {}
@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build damap
+    name: Build DAMAP
     runs-on: ubuntu-latest
     outputs:
       environment: ${{ steps.get_environment_from_git_ref.outputs.environment }}
@@ -78,15 +78,16 @@ jobs:
         fi
         kubectl replace -f secrets.yaml -n "${{ vars.KUBE_NAMESPACE }}" --force
         rm secrets.yaml
+    - name: Clean
+      run: |
+        echo "Delete previous ConfigMaps"
+        kubectl -n damap delete configmap api-mock-config
+        kubectl -n damap delete configmap nginx-config
     - name: Deploy
       env:
         SECRETS_CONTEXT: ${{ toJson(secrets) }} 
         VARS_CONTEXT: ${{ toJson(vars) }}   
-    - run: |
-        echo "Delete previous ConfigMaps"
-        kubectl -n damap delete configmap api-mock-config
-        kubectl -n damap delete configmap nginx-config
-    - run: |
+      run: |
         echo "Create ConfigMaps from the configuration files"
         kubectl -n damap create configmap api-mock-config --from-file=./config/api-mock/
         kubectl -n damap create configmap nginx-config --from-file=./config/nginx.conf        
