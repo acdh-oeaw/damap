@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: fits-service
+spec:
+  selector:
+      app: fits-service
+  ports:
+    - protocol: TCP
+      port: 8080
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fits-service
+spec:
+  selector:
+    matchLabels:
+      app: fits-service
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: fits-service
+        ID: "fits_service_service_id"
+    spec:
+      containers:
+      - name: fits-service
+        image: islandora/fits:main
+        imagePullPolicy: Always
+        command: []
+        resources:
+          limits:
+            memory: 8192Mi
+            cpu: "4"
+        stdin: true
+        tty: true
+        ports:
+        - containerPort: 8080

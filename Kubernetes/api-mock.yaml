@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-mock
+spec:
+  selector:
+      app: api-mock
+  ports:
+    - protocol: TCP
+      port: 80
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-mock
+spec:
+  selector:
+    matchLabels:
+      app: api-mock
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: api-mock
+        ID: "api_mock_service_id"
+    spec:
+      containers:
+      - name: api-mock
+        image: clue/json-server
+        imagePullPolicy: Always
+        command: ["db.json", "--routes", "routes.json"]
+        volumeMounts:
+        - name: api-mock-config
+          mountPath: /data
+        resources:
+          limits:
+            memory: 8192Mi
+            cpu: "4"
+        stdin: true
+        tty: true
+        ports:
+        - containerPort: 80
+      volumes:
+          - name: api-mock-config
+            configMap:
+              name: api-mock-config
+
+

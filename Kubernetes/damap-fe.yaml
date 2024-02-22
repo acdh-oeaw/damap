@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: damap-fe
+spec:
+  selector:
+      app: damap-fe
+  ports:
+    - protocol: TCP
+      port: 8080
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: damap-fe
+spec:
+  selector:
+    matchLabels:
+      app: damap-fe
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: damap-fe
+        ID: "damap_fe_service_id"
+    spec:
+      containers:
+      - name: damap-fe
+        image: ghcr.io/tuwien-csd/damap-frontend:next
+        imagePullPolicy: Always
+        command: []
+        resources:
+          limits:
+            memory: 8192Mi
+            cpu: "4"
+        stdin: true
+        tty: true
+        ports:
+        - containerPort: 8080
+      initContainers:
+      - name: damap-be
+        image: busybox
+        command: ['sh', '-c', 'until nslookup damap-be.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for damap-be; sleep 2; done;']
+
+
