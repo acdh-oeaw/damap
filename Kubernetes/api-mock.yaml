@@ -32,8 +32,12 @@ spec:
         imagePullPolicy: Always
         command: ["db.json", "--routes", "routes.json"]
         volumeMounts:
-        - name: api-mock-config
-          mountPath: /data
+        - mountPath: /data/db.json
+          name: api-mock-config
+          subPath: ./db.json
+        - mountPath: /data/db.json
+          name: api-mock-config
+          subPath: ./routes.json  
         resources:
           limits:
             memory: 8192Mi
