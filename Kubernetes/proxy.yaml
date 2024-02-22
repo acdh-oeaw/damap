@@ -81,7 +81,7 @@ spec:
   tls:
     - hosts:
         - proxy_public_url  
-      secretName: proxy_public_url-tls
+      secretName: damap-proxy-tls
 
 
 
