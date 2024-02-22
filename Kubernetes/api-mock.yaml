@@ -30,14 +30,11 @@ spec:
       - name: api-mock
         image: clue/json-server
         imagePullPolicy: Always
-        command: ["db.json", "--routes", "routes.json"]
+        command: []
+        args: ["--routes", "routes.json"]
         volumeMounts:
-        - mountPath: /data/db.json
+        - mountPath: /data
           name: api-mock-config
-          subPath: ./db.json
-        - mountPath: /data/db.json
-          name: api-mock-config
-          subPath: ./routes.json  
         resources:
           limits:
             memory: 8192Mi
