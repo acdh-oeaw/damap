@@ -37,8 +37,8 @@ spec:
           subPath: nginx.conf
         resources:
           limits:
-            memory: 8192Mi
-            cpu: "4"
+            memory: 1024Mi
+            cpu: "2"
         stdin: true
         tty: true
         ports:
