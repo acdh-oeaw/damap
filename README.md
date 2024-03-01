@@ -19,12 +19,12 @@ Environment variables needed for the Directus stack:
 |K8S_SECRET_PUBLIC_URL|:white_check_mark:|Variable|Env|The URI with https:// that should be configured for access to the service. |
 
 
-### How to deploy new Directus instance
+### How to deploy new DAMAP instance
 
 1. Create Kubernetes namespace.
-2. Create PostgresDB database with postgis extension.
+2. Create PostgresDB database.
 3. Create domain for the service and point it to the cluster.
-4. Create new GitHub environment for the service that should have the same name as new GitHub branch that will be used for the new Directus instance.
+4. Create new GitHub environment for the service that should have the same name as new GitHub branch that will be used for the new DAMAP instance.
 5. Add GitHub environment variables and secrets described in the table above.
 6. Create a new branch in this repo that should have tha same name as the Kubernetes namespace created in the first step.
-8. The newly created GitHub branch will trigger the Github pipeline that will deploy new Directus stack to the Kubernetes Cluster.
+8. The newly created GitHub branch will trigger the Github pipeline that will deploy new DAMAP stack to the Kubernetes Cluster.
