@@ -59,9 +59,9 @@ spec:
         - name: DB_VENDOR
           value: postgres
         volumeMounts:
-        - name: keycloak-db
+        - name: keycloak-db-data
           mountPath: /var/lib/postgresql/data
       volumes:
-          - name: keycloak-db
+          - name: keycloak-db-data
             persistentVolumeClaim:
-              claimName: keycloak-db
+              claimName: keycloak-db-data
