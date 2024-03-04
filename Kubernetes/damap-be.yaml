@@ -56,14 +56,17 @@ spec:
           timeoutSeconds: 15
           failureThreshold: 5
       initContainers:
+      - name: damap-db
+        image: busybox
+        command: ['sh', '-c', 'until nslookup damap-db.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for damap-db; sleep 2; done;']
+      - name: keycloak
+        image: busybox
+        command: ['sh', '-c', 'until nslookup keycloak.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for keycloak; sleep 2; done;']
       - name: api-mock
         image: busybox
         command: ['sh', '-c', 'until nslookup api-mock.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for api-mock; sleep 2; done;']
       - name: fits-service
         image: busybox
         command: ['sh', '-c', 'until nslookup fits-service.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for fits-service; sleep 2; done;']
-      - name: keycloak
-        image: curlimages/curl
-        command: ["curl", "-I", "-s", "-o", "/dev/null", "https://auth.acdh.oeaw.ac.at"]
 
 

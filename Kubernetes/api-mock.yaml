@@ -33,7 +33,11 @@ spec:
         command: []
         args: ["--routes", "routes.json"]
         volumeMounts:
-        - mountPath: /data
+        - mountPath: /data/db.json
+          subPath: db.json
+          name: api-mock-config
+        - mountPath: /data/routes.json
+          subPath: routes.json
           name: api-mock-config
         resources:
           limits:

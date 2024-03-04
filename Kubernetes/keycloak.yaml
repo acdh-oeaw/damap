@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+spec:
+  selector:
+      app: keycloak
+  ports:
+    - protocol: TCP
+      port: 8080
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+spec:
+  selector:
+    matchLabels:
+      app: keycloak
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: keycloak
+        ID: "keycloak_service_id"
+    spec:
+      containers:
+      - name: keycloak
+        image: jboss/keycloak
+        env: 
+        - name: KEYCLOAK_USER
+          value: admin
+        - name: KEYCLOAK_PASSWORD
+          value: admin
+        - name: DB_ADDR
+          value: keycloak-db
+        - name: DB_DATABASE
+          value: keycloak
+        - name: DB_USER
+          value: keycloak
+        - name: DB_PORT
+          value: 5432
+        - name: DB_PASSWORD
+          value: keycloak
+        - name: KEYCLOAK_IMPORT
+          value: /tmp/sample-damap-realm-export.json
+        command: []
+        resources:
+          limits:
+            memory: 1024Mi
+        stdin: true
+        tty: true
+        ports:
+        - containerPort: 8080
+      volumeMounts:
+      - name: sample-damap-realm-export
+        mountPath: /tmp/sample-damap-realm-export.json
+        subPath: sample-damap-realm-export.json
+    volumes:
+      - name: sample-damap-realm-export
+        configMap:
+          name: sample-damap-realm-export
+    initContainers:
+      - name: keycloak-db
+        image: busybox
+        command: ['sh', '-c', 'until nslookup keycloak-db.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for keycloak-db; sleep 2; done;']

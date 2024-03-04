@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: damap-db
+spec:
+  selector:
+      app: damap-db
+  ports:
+    - protocol: TCP
+      port: 5432
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: damap-db-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: "2000Mi"
+  volumeMode: Filesystem
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: damap-db
+spec:
+  selector:
+    matchLabels:
+      app: damap-db
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: damap-db
+        ID: "damap_db_service_id"
+    spec:
+      containers:
+      - name: damap-db
+        image: postgres:12
+        resources:
+          limits:
+            memory: 600Mi
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          value: damap
+        - name: POSTGRES_PASSWORD
+          value: pw4damap
+        - name: POSTGRES_USER
+          value: damap
+        volumeMounts:
+        - name: damap-db-data
+          mountPath: /var/lib/postgresql/data
+      volumes:
+          - name: damap-db-data
+            persistentVolumeClaim:
+              claimName: damap-db-data

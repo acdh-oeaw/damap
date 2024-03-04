@@ -2,9 +2,7 @@
 
 This repo is based on the [Docker Compose DAMAP documentation](https://github.com/tuwien-csd/damap-backend/tree/next/docker "Docker Compose based DAMAP") and contains configuration files needed for creating deployment pipeline based on GitHub actions that deploys DAMAP Docker images as DAMAP stack to ACDH-CH Kubernetes environment. 
 
-Due to specific ACDH-CH environment that is using centralized PostgresDB, dedicated PostgresDB and Keycloak Docker images are not used with this setup.
-
-Environment variables needed for the Directus stack:
+Environment variables needed for the DAMAP stack:
 
 |Name|Required|Type|Level|Description|
 |----|:------:|----|:---:|-----------|
@@ -16,6 +14,9 @@ Environment variables needed for the Directus stack:
 |API_MOCK_SERVICE_ID|:white_check_mark:|Variable|Env|A K8s label ID is attached to the workload/deployment with this value (usually a number) |
 |DAMAP_BE_SERVICE_ID|:white_check_mark:|Variable|Env|A K8s label ID is attached to the workload/deployment with this value (usually a number) |
 |DAMAP_FE_SERVICE_ID|:white_check_mark:|Variable|Env|A K8s label ID is attached to the workload/deployment with this value (usually a number) |
+|KEYCLOAK_SERVICE_ID|:white_check_mark:|Variable|Env|A K8s label ID is attached to the workload/deployment with this value (usually a number) |
+|KEYCLOAK_DB_SERVICE_ID|:white_check_mark:|Variable|Env|A K8s label ID is attached to the workload/deployment with this value (usually a number) |
+|DAMAP_DB_SERVICE_ID|:white_check_mark:|Variable|Env|A K8s label ID is attached to the workload/deployment with this value (usually a number) |
 |K8S_SECRET_PUBLIC_URL|:white_check_mark:|Variable|Env|The URI with https:// that should be configured for access to the service. |
 
 
