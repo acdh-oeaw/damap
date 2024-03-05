@@ -4,10 +4,10 @@ metadata:
   name: damap-fe
 spec:
   selector:
-      app: damap-fe
+    app: damap-fe
   ports:
-    - protocol: TCP
-      port: 8080
+  - protocol: TCP
+    port: 8080
 
 ---
 

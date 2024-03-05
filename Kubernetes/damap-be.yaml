@@ -4,10 +4,10 @@ metadata:
   name: damap-be
 spec:
   selector:
-      app: damap-be
+    app: damap-be
   ports:
-    - protocol: TCP
-      port: 8080
+  - protocol: TCP
+    port: 8080
 
 ---
 
@@ -39,6 +39,9 @@ spec:
         tty: true
         ports:
         - containerPort: 8080
+        envFrom:
+        - configMapRef:
+            name: damap-env
         readinessProbe:
           httpGet:
             path: /q/health/live
