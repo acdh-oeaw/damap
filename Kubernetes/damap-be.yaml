@@ -39,6 +39,9 @@ spec:
         tty: true
         ports:
         - containerPort: 8080
+        envFrom:
+        - secretRef:
+            name: damap_be_secrets
         readinessProbe:
           httpGet:
             path: /q/health/live
