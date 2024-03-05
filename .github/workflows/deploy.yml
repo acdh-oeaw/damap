@@ -10,8 +10,7 @@ jobs:
     name: Build DAMAP
     runs-on: ubuntu-latest
     outputs:
-      environment: ${{ steps.get_environment_from_git_ref.outputs.environment }}
-      environment_short: ${{ steps.get_environment_from_git_ref.outputs.environment_short }}
+      environment: ${{ github.ref_name }}
       registry_root: ghcr.io/${{ github.repository }}/
       submodules: "true"
     steps:
