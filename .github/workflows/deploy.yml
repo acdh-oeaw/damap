@@ -32,6 +32,7 @@ jobs:
       with:
         images: |
           ghcr.io/${{ github.repository }}/damap-backend
+        tags: latest
     - name: Create build environment
       env:
         VARS_CONTEXT: ${{ toJson(vars) }}
@@ -49,6 +50,7 @@ jobs:
         context: damap-backend/.
         platforms: linux/amd64
         push: true
+        tags: ${{ steps.meta.outputs.tags }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
   deploy:
