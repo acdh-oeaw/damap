@@ -34,7 +34,7 @@ spec:
   selector:
     matchLabels:
       app: damap-db
-  replicas: 0
+  replicas: 1
   template:
     metadata:
       labels:
