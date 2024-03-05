@@ -31,7 +31,7 @@ jobs:
       uses: docker/metadata-action@v5
       with:
         images: |
-          ghcr.io/${{ github.repository }}/damap-backend }}
+          ghcr.io/${{ github.repository }}/damap-backend
     - name: Create build environment
       env:
         VARS_CONTEXT: ${{ toJson(vars) }}
