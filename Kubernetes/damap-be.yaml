@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
       - name: damap-be
-        image: acdh-oeaw/damap/damap-backend
+        image: ghcr.io/acdh-oeaw/damap/damap-backend:latest
         imagePullPolicy: Always
         command: []
         resources:
