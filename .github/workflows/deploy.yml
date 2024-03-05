@@ -30,6 +30,43 @@ jobs:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Create tags based on git data
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: |
+          ghcr.io/${{ github.repository }}/damap-backend }}
+    - name: Create build environment
+      env:
+        SECRETS_CONTEXT: ${{ toJson(secrets) }}
+        VARS_CONTEXT: ${{ toJson(vars) }}
+      run: |
+        echo -n "$SECRETS_CONTEXT" | jq -r '[to_entries[]|select(.key|startswith("K8S_SECRET_"))]|map("export \(.key|sub("K8S_SECRET_"; ""))=\(.value|tostring|@sh)")|.[]' > secrets.env
+        echo -n "$VARS_CONTEXT" | jq -r '[to_entries[]|select(.key|startswith("K8S_SECRET_"))]|map("export \(.key|sub("K8S_SECRET_"; ""))=\(.value|tostring|@sh)")|.[]' >> secrets.env
+        echo -n "$VARS_CONTEXT" | jq -r '[to_entries[]|select(.key == "SERVICE_ID")]|map("export \(.key)=\(.value|tostring)")|.[]' >> secrets.env
+        if [ "${PUBLIC_URL}x" == "x" ]
+        then echo -n "$VARS_CONTEXT" | jq -r '[to_entries[]|select(.key == "PUBLIC_URL")]|map("export \(.key)=\(.value|tostring)")|.[]' >> secrets.env
+        else echo "export PUBLIC_URL=$PUBLIC_URL" >> secrets.env 
+        fi
+        echo -n "$SECRETS_CONTEXT" | jq -r '[to_entries[]|select(.key|startswith("LC_K8S_SECRET_"))]|map("export \(.key|sub("LC_K8S_SECRET_"; "")|ascii_downcase)=\(.value|tostring|@sh)")|.[]' >> secrets.env
+        echo -n "$VARS_CONTEXT" | jq -r '[to_entries[]|select(.key|startswith("LC_K8S_SECRET_"))]|map("export \(.key|sub("LC_K8S_SECRET_"; "")|ascii_downcase)=\(.value|tostring|@sh)")|.[]' >> secrets.env
+        git clone --depth 1 --branch ${{ vars.DAMAP_DB_TAG }} https://github.com/tuwien-csd/damap-backend.git
+        sed -i -e "s|env: DEV|env: PROD|g" damap-backend/src/main/resources/application.yaml
+        sed -i -e "s|origins: http://localhost:8085|origins: ${{ vars.DAMAP_BE_ORIGINS }}|g" damap-backend/src/main/resources/application.yaml
+        sed -i -e "s|url: http://keycloak:8080/auth/realms/damap|url: ${{ vars.DAMAP_BE_URL }}|g" damap-backend/src/main/resources/application.yaml
+        sed -i -e "s|url: http://localhost:8087/auth/realms/damap|url: ${{ vars.DAMAP_BE_URL }}|g" damap-backend/src/main/resources/application.yaml
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    - name: Build and push
+      uses: docker/build-push-action@v5
+      with:
+        context: damap-backend/.
+        platforms: linux/amd64
+        push: true
+        secret-files: |
+          "secrets_env=./secrets.env"
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
   deploy:
     runs-on: ubuntu-latest
     needs: [build]

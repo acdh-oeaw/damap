@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
       - name: damap-be
-        image: ghcr.io/tuwien-csd/damap-backend:next
+        image: acdh-oeaw/damap/damap-backend
         imagePullPolicy: Always
         command: []
         resources:
