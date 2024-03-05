@@ -39,9 +39,6 @@ spec:
         tty: true
         ports:
         - containerPort: 8080
-        envFrom:
-        - configMapRef:
-            name: damap-env
         readinessProbe:
           httpGet:
             path: /q/health/live

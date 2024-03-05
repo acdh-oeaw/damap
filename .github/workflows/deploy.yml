@@ -15,6 +15,86 @@ jobs:
       registry_root: ghcr.io/${{ github.repository }}/
       submodules: "true"
     steps:
+    - name: Get environment from git ref
+      id: get_environment_from_git_ref
+      run: "echo \"Running on branch ${{ github.ref_name }}\"\nif [ \"${{ github.ref }}\" = \"refs/heads/main\" ]; then\n  echo \"environment=main\"\n  echo \"environment=main\" >> $GITHUB_OUTPUT\n  echo \"environment_short=main\" >> $GITHUB_OUTPUT\nelse\n  echo \"environment=${{ github.ref_name }}\"\n  echo \"environment=${{ github.ref_name }}\" >> $GITHUB_OUTPUT\n  echo \"environment_short=$(echo -n ${{ github.ref_name }} | sed 's/feat\\(ure\\)\\{0,1\\}[_/]//' | tr '_' '-' | tr '[:upper:]' '[:lower:]' )\" >> $GITHUB_OUTPUT\nfi    \n"
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [build]
+    environment: ${{ github.ref_name }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    - name: Kubernetes credentials
+      run: |
+        mkdir ${HOME}/.kube
+        echo ${{ secrets.C2_KUBE_CONFIG }} | base64 --decode > ${HOME}/.kube/config
+        chmod 0600 ${HOME}/.kube/config
+        KUBE_NAMESPACE="${{ secrets.KUBE_NAMESPACE }}"
+        echo "KUBE_NAMESPACE=$KUBE_NAMESPACE" >> $GITHUB_ENV
+        kubectl config set-context --current --namespace=${{ secrets.KUBE_NAMESPACE }}
+        kubectl get pod
+    - name: Set environment variables
+      env:
+        SECRETS_CONTEXT: ${{ toJson(secrets) }}
+        VARS_CONTEXT: ${{ toJson(vars) }}
+      run: |
+        cat > secrets.yaml <<EOF
+        apiVersion: v1
+        kind: Secret
+        metadata:
+            name: ${{ github.ref_name }}
+        type: Opaque
+        data:
+        EOF
+        k8s_secrets=$(echo -n "$SECRETS_CONTEXT" | jq -r '[to_entries[]|select(.key|startswith("K8S_SECRET_"))]|map("  \(.key|sub("K8S_SECRET_"; "")): \(.value|tostring|@base64)")|.[]')
+        if [ "$k8s_secrets"x == 'x' ]
+        then echo ' {}' >> secrets.yaml
+        else echo "$k8s_secrets" >> secrets.yaml
+        fi
+        kubectl replace -f secrets.yaml -n "${{ vars.KUBE_NAMESPACE }}" --force
+        rm secrets.yaml
+    - name: Clean
+      run: |
+        echo "Delete previous ConfigMaps"
+        kubectl -n damap delete configmap api-mock-config
+        kubectl -n damap delete configmap nginx-config
+        kubectl -n damap delete configmap sample-damap-realm-export
+    - name: Deploy
+      env:
+        SECRETS_CONTEXT: ${{ toJson(secrets) }}
+        VARS_CONTEXT: ${{ toJson(vars) }}
+name: Deploy DAMAP
+
+on:
+  push: {}
+  workflow_dispatch: {}
+
+
+jobs:
+  build:
+    name: Build DAMAP
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.get_environment_from_git_ref.outputs.environment }}
+      environment_short: ${{ steps.get_environment_from_git_ref.outputs.environment_short }}
+      registry_root: ghcr.io/${{ github.repository }}/
+      submodules: "true"
+    steps:
       - name: Get environment from git ref
         id: get_environment_from_git_ref
         run: |
@@ -104,5 +184,6 @@ jobs:
         sed -i -e "s|keycloak_service_service_id|${{ vars.KEYCLOAK_SERVICE_ID }}|g" Kubernetes/keycloak.yaml
         sed -i -e "s|keycloak_db_service_service_id|${{ vars.KEYCLOAK_DB_SERVICE_ID }}|g" Kubernetes/keycloak-db.yaml
         sed -i -e "s|damap_db_service_service_id|${{ vars.DAMAP_DB_SERVICE_ID }}|g" Kubernetes/damap-db.yaml
-        echo "Deploying from branch ${{ github.ref_name }}"
+        echo "Deploying from the branch ${{ github.ref_name }}"
         kubectl -n "${{ vars.KUBE_NAMESPACE }}" apply -f Kubernetes/
+
