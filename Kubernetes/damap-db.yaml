@@ -4,10 +4,10 @@ metadata:
   name: damap-db
 spec:
   selector:
-      app: damap-db
+    app: damap-db
   ports:
-    - protocol: TCP
-      port: 5432
+  - protocol: TCP
+    port: 5432
 
 ---
 
@@ -17,8 +17,8 @@ metadata:
   name: damap-db-data
 spec:
   accessModes:
-    - ReadWriteOnce
-    - ReadWriteMany
+  - ReadWriteOnce
+  - ReadWriteMany
   resources:
     requests:
       storage: "2000Mi"
@@ -34,7 +34,7 @@ spec:
   selector:
     matchLabels:
       app: damap-db
-  replicas: 1
+  replicas: 0
   template:
     metadata:
       labels:
@@ -60,6 +60,6 @@ spec:
         - name: damap-db-data
           mountPath: /var/lib/postgresql/data
       volumes:
-          - name: damap-db-data
-            persistentVolumeClaim:
-              claimName: damap-db-data
+      - name: damap-db-data
+        persistentVolumeClaim:
+          claimName: damap-db-data

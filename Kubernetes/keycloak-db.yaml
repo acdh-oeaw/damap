@@ -4,10 +4,10 @@ metadata:
   name: keycloak-db
 spec:
   selector:
-      app: keycloak-db
+    app: keycloak-db
   ports:
-    - protocol: TCP
-      port: 5432
+  - protocol: TCP
+    port: 5432
 
 ---
 
@@ -17,8 +17,8 @@ metadata:
   name: keycloak-db-data
 spec:
   accessModes:
-    - ReadWriteOnce
-    - ReadWriteMany
+  - ReadWriteOnce
+  - ReadWriteMany
   resources:
     requests:
       storage: "2000Mi"
@@ -34,7 +34,7 @@ spec:
   selector:
     matchLabels:
       app: keycloak-db
-  replicas: 1
+  replicas: 0
   template:
     metadata:
       labels:
@@ -62,6 +62,6 @@ spec:
         - name: keycloak-db-data
           mountPath: /var/lib/postgresql/data
       volumes:
-          - name: keycloak-db-data
-            persistentVolumeClaim:
-              claimName: keycloak-db-data
+      - name: keycloak-db-data
+        persistentVolumeClaim:
+          claimName: keycloak-db-data
