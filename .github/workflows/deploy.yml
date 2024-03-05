@@ -9,10 +9,7 @@ jobs:
   build:
     name: Build DAMAP
     runs-on: ubuntu-latest
-    outputs:
-      environment: ${{ github.ref_name }}
-      registry_root: ghcr.io/${{ github.repository }}/
-      submodules: "true"
+    environment: ${{ github.ref_name }}
     steps:
     - name: Get environment from git ref
       id: get_environment_from_git_ref
@@ -37,13 +34,8 @@ jobs:
           ghcr.io/${{ github.repository }}/damap-backend }}
     - name: Create build environment
       env:
-        SECRETS_CONTEXT: ${{ toJson(secrets) }}
         VARS_CONTEXT: ${{ toJson(vars) }}
       run: |
-        echo -n "$SECRETS_CONTEXT" | jq -r '[to_entries[]|select(.key|startswith("K8S_SECRET_"))]|map("export \(.key|sub("K8S_SECRET_"; ""))=\(.value|tostring|@sh)")|.[]' > secrets.env
-        echo -n "$VARS_CONTEXT" | jq -r '[to_entries[]|select(.key|startswith("K8S_SECRET_"))]|map("export \(.key|sub("K8S_SECRET_"; ""))=\(.value|tostring|@sh)")|.[]' >> secrets.env
-        echo -n "$SECRETS_CONTEXT" | jq -r '[to_entries[]|select(.key|startswith("LC_K8S_SECRET_"))]|map("export \(.key|sub("LC_K8S_SECRET_"; "")|ascii_downcase)=\(.value|tostring|@sh)")|.[]' >> secrets.env
-        echo -n "$VARS_CONTEXT" | jq -r '[to_entries[]|select(.key|startswith("LC_K8S_SECRET_"))]|map("export \(.key|sub("LC_K8S_SECRET_"; "")|ascii_downcase)=\(.value|tostring|@sh)")|.[]' >> secrets.env
         git clone --depth 1 --branch ${{ vars.DAMAP_BE_TAG }} https://github.com/tuwien-csd/damap-backend.git
         sed -i -e "s|env: DEV|env: PROD|g" damap-backend/src/main/resources/application.yaml
         sed -i -e "s|origins: http://localhost:8085|origins: ${{ vars.DAMAP_BE_ORIGINS }}|g" damap-backend/src/main/resources/application.yaml
