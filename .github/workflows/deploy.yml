@@ -94,6 +94,6 @@ jobs:
         sed -i -e "s|keycloak_service_service_id|${{ vars.KEYCLOAK_SERVICE_ID }}|g" Kubernetes/keycloak.yaml
         sed -i -e "s|keycloak_db_service_service_id|${{ vars.KEYCLOAK_DB_SERVICE_ID }}|g" Kubernetes/keycloak-db.yaml
         sed -i -e "s|damap_db_service_service_id|${{ vars.DAMAP_DB_SERVICE_ID }}|g" Kubernetes/damap-db.yaml
-        sed -i -e "s|damap_be_secrets|${{ github.ref_name }}|g" Kubernetes/damap-be.yaml
+        sed -i -e "s|damap_be_secrets|main|g" Kubernetes/damap-be.yaml
         echo "Deploying from the branch ${{ github.ref_name }}" 
         kubectl -n "${{ vars.KUBE_NAMESPACE }}" apply -f Kubernetes/
