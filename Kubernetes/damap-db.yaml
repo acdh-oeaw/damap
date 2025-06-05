@@ -43,7 +43,7 @@ spec:
     spec:
       containers:
       - name: damap-db
-        image: postgres:16
+        image: postgres:12
         resources:
           limits:
             memory: 600Mi
