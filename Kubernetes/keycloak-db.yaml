@@ -43,7 +43,7 @@ spec:
     spec:
       containers:
       - name: keycloak-db
-        image: postgres:12
+        image: postgres:16
         resources:
           limits:
             memory: 600Mi
