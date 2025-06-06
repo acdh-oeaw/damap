@@ -46,7 +46,7 @@ spec:
           httpGet:
             path: /q/health/live
             port: 8080
-          initialDelaySeconds: 30
+          initialDelaySeconds: 10
           periodSeconds: 30
           timeoutSeconds: 15
           failureThreshold: 5
@@ -54,7 +54,7 @@ spec:
           httpGet:
             path: /q/health/live
             port: 8080
-          initialDelaySeconds: 30
+          initialDelaySeconds: 10
           periodSeconds: 30
           timeoutSeconds: 15
           failureThreshold: 5
@@ -64,10 +64,10 @@ spec:
             path: /q/health/live
             port: 8080
             scheme: HTTP
-          initialDelaySeconds: 240
+          initialDelaySeconds: 60
           periodSeconds: 10
           successThreshold: 1
-          timeoutSeconds: 1
+          timeoutSeconds: 15
       initContainers:
       - name: damap-db
         image: busybox
