@@ -128,7 +128,7 @@ spec:
           - name: sample-damap-realm-export
             configMap:
               name: sample-damap-realm-export
-          initContainers:
-          - name: keycloak-db
-            image: busybox
-            command: ['sh', '-c', 'until nslookup keycloak-db.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for keycloak-db; sleep 2; done;']
+         # initContainers:
+         # - name: keycloak-db
+           # image: busybox
+           # command: ['sh', '-c', 'until nslookup keycloak-db.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for keycloak-db; sleep 2; done;']
