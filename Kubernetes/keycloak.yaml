@@ -120,15 +120,15 @@ spec:
             requests:
               cpu: 500m
               memory: 1700Mi
-        volumeMounts:
+          volumeMounts:
+          - name: sample-damap-realm-export
+            mountPath: /tmp/sample-damap-realm-export.json
+            subPath: sample-damap-realm-export.json
+        volumes:
         - name: sample-damap-realm-export
-          mountPath: /tmp/sample-damap-realm-export.json
-          subPath: sample-damap-realm-export.json
-      volumes:
-      - name: sample-damap-realm-export
-        configMap:
-          name: sample-damap-realm-export
-      initContainers:
-      - name: keycloak-db
-        image: busybox
-        command: ['sh', '-c', 'until nslookup keycloak-db.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for keycloak-db; sleep 2; done;']
+          configMap:
+            name: sample-damap-realm-export
+        initContainers:
+        - name: keycloak-db
+          image: busybox
+          command: ['sh', '-c', 'until nslookup keycloak-db.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for keycloak-db; sleep 2; done;']
