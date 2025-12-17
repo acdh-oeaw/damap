@@ -96,7 +96,6 @@ jobs:
         echo "Delete previous ConfigMaps"
         kubectl -n damap delete configmap api-mock-config
         kubectl -n damap delete configmap nginx-config
-        kubectl -n damap delete configmap sample-damap-realm-export
     - name: Deploy
       env:
         SECRETS_CONTEXT: ${{ toJson(secrets) }}
@@ -104,8 +103,7 @@ jobs:
       run: |
         echo "Create ConfigMaps from the configuration files"
         kubectl -n damap create configmap api-mock-config --from-file=./config/api-mock/data/
-        kubectl -n damap create configmap nginx-config --from-file=./config/nginx.conf    
-        kubectl -n damap create configmap sample-damap-realm-export --from-file=./config/sample-damap-realm-export.json     
+        kubectl -n damap create configmap nginx-config --from-file=./config/nginx.conf       
         echo "Introduce env variable related to the branch ${{ github.ref_name }}"     
         sed -i -e "s|damap_be_service_id|${{ vars.DAMAP_BE_SERVICE_ID }}|g" Kubernetes/damap-be.yaml
         sed -i -e "s|damap_fe_service_id|${{ vars.DAMAP_FE_SERVICE_ID }}|g" Kubernetes/damap-fe.yaml
