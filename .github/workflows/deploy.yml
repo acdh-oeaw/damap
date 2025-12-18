@@ -243,3 +243,4 @@ jobs:
         run: |
           set -euo pipefail
           echo "Deploying to namespace: $KUBE_NAMESPACE  (tag: ${{ needs.build.outputs.tag }})"
+          kubectl -n "$KUBE_NAMESPACE" apply -f Kubernetes/
