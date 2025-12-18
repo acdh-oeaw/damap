@@ -240,7 +240,7 @@ jobs:
 
           # Replace the placeholder tag in both backend and frontend manifests
           sed -i -e "s|damap_tag|${TAG}|g" Kubernetes/damap-be.yaml
-          sed -i -e "s|damap_tag|${TAG}|g          sed -i -e "s|damap_tag|${TAG}|g" Kubernetes/damap-fe.yaml
+          sed -i -e "s|damap_tag|${TAG}|g" Kubernetes/damap-fe.yaml
 
       # Apply all manifests in the Kubernetes/ directory to the target namespace
       - name: Deploy manifests
