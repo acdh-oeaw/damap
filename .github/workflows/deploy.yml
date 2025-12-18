@@ -50,7 +50,7 @@ jobs:
     steps:
       # Checkout the repository (fetch-depth 0 is useful if you later need tags/annotations)
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
