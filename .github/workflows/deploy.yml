@@ -173,28 +173,23 @@ jobs:
       - name: Apply Secrets (from repository secrets)
         env:
           SECRETS_CONTEXT: ${{ toJson(secrets) }}
-        shell: bash
+          VARS_CONTEXT: ${{ toJson(vars) }}
         run: |
-          set -euo pipefail
-          echo "apiVersion: v1
+          cat > secrets.yaml <<EOF
+          apiVersion: v1
           kind: Secret
           metadata:
-            name: ${{ github.ref_name }}
+              name: ${{ github.ref_name }}
           type: Opaque
-          data:" > secrets.yaml
-
-          echo "$SECRETS_CONTEXT" \
-          | jq -r '[to_entries[] | select(.key | startswith("K8S_SECRET_"))]
-                    | map("  \(.key | sub(\"K8S_SECRET_\"; \"\")): \(.value | tostring | @base64)")
-                    | .[]' >> secrets.yaml
-
-          # If no K8S_SECRET_* entries exist, keep YAML valid with an empty map
-          if ! grep -q '  ' secrets.yaml; then
-            echo '  {}' >> secrets.yaml
+          data:
+          EOF
+          k8s_secrets=$(echo -n "$SECRETS_CONTEXT" | jq -r '[to_entries[]|select(.key|startswith("K8S_SECRET_"))]|map("  \(.key|sub("K8S_SECRET_"; "")): \(.value|tostring|@base64)")|.[]')
+          if [ "$k8s_secrets"x == 'x' ]
+          then echo ' {}' >> secrets.yaml
+          else echo "$k8s_secrets" >> secrets.yaml
           fi
-
-          kubectl apply -f secrets.yaml -n "$KUBE_NAMESPACE"
-          rm -f secrets.yaml
+          kubectl replace -f secrets.yaml -n "${{ vars.KUBE_NAMESPACE }}" --force
+          rm secrets.yaml
 
       # Clean old ConfigMaps (ignore if they do not exist)
       - name: Clean old ConfigMaps (idempotent)
