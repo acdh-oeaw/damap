@@ -17,7 +17,7 @@
 # - Set repository variable: DAMAP_BE_TAG (optional; if not set, branch name is used).
 # - Set repository variable or secret: KUBE_NAMESPACE (namespace where to deploy).
 # - Set secret: C2_KUBE_CONFIG (base64 encoded kubeconfig).
-# - Optionally set secrets starting with K8S_SECRET_ to be injected as a Kubernetes Secret.
+# - Optionally set secrets starting with K8S_SECRET_* to be injected as a Kubernetes Secret.
 #
 # Notes:
 # - This workflow assumes your Kubernetes manifests contain the placeholder 'damap_tag'
@@ -47,6 +47,7 @@ jobs:
     outputs:
       tag: ${{ steps.compute_tag.outputs.TAG }}                               # Export computed TAG for downstream jobs
       image: ghcr.io/${{ github.repository }}/damap-backend                   # Export image name (optional convenience)
+
     steps:
       # Checkout the repository (fetch-depth 0 is useful if you later need tags/annotations)
       - name: Checkout
@@ -63,6 +64,7 @@ jobs:
         id: compute_tag
         shell: bash
         run: |
+          set -euo pipefail
           if [[ -n "${{ vars.DAMAP_BE_TAG }}" ]]; then
             TAG="${{ vars.DAMAP_BE_TAG }}"
           else
@@ -139,6 +141,7 @@ jobs:
     environment: ${{ github.ref_name }}
     permissions:
       contents: read                       # Required for actions/checkout
+
     steps:
       # Checkout manifests and configuration files (include submodules if used)
       - name: Checkout (with submodules)
@@ -168,31 +171,48 @@ jobs:
           kubectl config set-context --current --namespace="$KNS"
           kubectl get pod -n "$KNS" || true
 
+      # --- VARIJANTA A: robust Heredoc for jq filter + safe stdin ---
       # Build a Kubernetes Secret manifest from all repository secrets prefixed with K8S_SECRET_
-      # and apply it to the target namespace.
+      # and apply it to the target namespace. We extract the jq filter via a literal heredoc to
+      # avoid shell quoting issues, and pass SECRETS_CONTEXT via a here-string.
       - name: Apply Secrets (from repository secrets)
         env:
           SECRETS_CONTEXT: ${{ toJson(secrets) }}
         shell: bash
         run: |
           set -euo pipefail
-          echo "apiVersion: v1
-          kind: Secret
-          metadata:
-            name: ${{ github.ref_name }}
-          type: Opaque
-          data:" > secrets.yaml
 
-          echo "$SECRETS_CONTEXT" \
-          | jq -r '[to_entries[] | select(.key | startswith("K8S_SECRET_"))]
-                    | map("  \(.key | sub(\"K8S_SECRET_\"; \"\")): \(.value | tostring | @base64)")
-                    | .[]' >> secrets.yaml
+          # Create initial Secret YAML with a placeholder name
+          cat > secrets.yaml <<'YAML'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: REPLACE_WITH_BRANCH
+type: Opaque
+data:
+YAML
 
-          # If no K8S_SECRET_* entries exist, keep YAML valid with an empty map
-          if ! grep -q '  ' secrets.yaml; then
-            echo '  {}' >> secrets.yaml
-          fi
+          # Replace placeholder with the current branch/environment name
+          sed -i -e "s|REPLACE_WITH_BRANCH|${{ github.ref_name }}|g" secrets.yaml
 
+          # Define jq program via literal heredoc (no shell expansion inside).
+          # This filter selects all secrets starting with K8S_SECRET_, strips the prefix,
+          # and base64-encodes their values to produce valid Secret.data entries.
+          JQ_FILTER="$(cat <<'JQ'
+to_entries
+| map(select(.key | startswith("K8S_SECRET_")))
+| if length == 0 then
+    "  {}"
+  else
+    .[] | "  \(.key | sub("^K8S_SECRET_"; "")): \(.value | tostring | @base64)"
+  end
+JQ
+)"
+
+          # Run jq: feed SECRETS_CONTEXT as stdin (here-string) and append results to secrets.yaml
+          jq -r "$JQ_FILTER" <<< "$SECRETS_CONTEXT" >> secrets.yaml
+
+          # Apply the secret and clean up
           kubectl apply -f secrets.yaml -n "$KUBE_NAMESPACE"
           rm -f secrets.yaml
 
@@ -242,7 +262,7 @@ jobs:
           sed -i -e "s|damap_tag|${TAG}|g" Kubernetes/damap-be.yaml
           sed -i -e "s|damap_tag|${TAG}|g" Kubernetes/damap-fe.yaml
 
-      # Apply all manifests in the Kubernetes/ directory to the target namespace
+      # Apply all manifests in      # Apply all manifests in the Kubernetes/ directory to the target namespace
       - name: Deploy manifests
         shell: bash
         run: |
