@@ -37,7 +37,7 @@ jobs:
       env:
         VARS_CONTEXT: ${{ toJson(vars) }}
       run: |
-        git clone --depth 1 --branch ${{ vars.DAMAP_BE_TAG }} https://github.com/tuwien-csd/damap-backend.git
+        git clone --depth 1 --branch ${{ vars.DAMAP_BE_TAG }} https://github.com/damap-org/damap-backend.git
         sed -i -e "s|env: DEV|env: PROD|g" damap-backend/src/main/resources/application.yaml
         sed -i -e "s|origins: http://localhost:8085|origins: ${{ vars.DAMAP_BE_ORIGINS }}|g" damap-backend/src/main/resources/application.yaml
         sed -i -e "s|url: http://keycloak:8080/realms/damap|url: ${{ vars.DAMAP_BE_URL }}|g" damap-backend/src/main/resources/application.yaml

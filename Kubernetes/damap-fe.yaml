@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
       - name: damap-fe
-        image: ghcr.io/tuwien-csd/damap-frontend:next
+        image: ghcr.io/damap-org/damap-frontend:latest
         imagePullPolicy: Always
         command: []
         resources:
