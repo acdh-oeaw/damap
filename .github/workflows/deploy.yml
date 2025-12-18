@@ -1,120 +1,250 @@
+
+# ---------------------------------------------
+# GitHub Actions: Deploy DAMAP (Backend + Frontend)
+# ---------------------------------------------
+# This workflow builds and pushes the DAMAP backend Docker image to GHCR,
+# then deploys Kubernetes manifests using kubectl.
+#
+# Key features:
+# - Uses repository variable DAMAP_BE_TAG as the single source of truth for the tag
+#   (with safe fallback to the branch name, then 'latest' as last resort).
+# - Minimal permissions for security, and concurrency per branch to avoid race conditions.
+# - Propagates the computed TAG from build to deploy via job outputs.
+# - Applies Secrets from GitHub repository secrets (prefixed with K8S_SECRET_) to K8s.
+# - Idempotent configmap handling and consistent namespace management.
+#
+# Prerequisites:
+# - Set repository variable: DAMAP_BE_TAG (optional; if not set, branch name is used).
+# - Set repository variable or secret: KUBE_NAMESPACE (namespace where to deploy).
+# - Set secret: C2_KUBE_CONFIG (base64 encoded kubeconfig).
+# - Optionally set secrets starting with K8S_SECRET_ to be injected as a Kubernetes Secret.
+#
+# Notes:
+# - This workflow assumes your Kubernetes manifests contain the placeholder 'damap_tag'
+#   for the container image tag (replaced via sed).
+# - Adjust image names, paths, and URLs to your environment as needed.
+# ---------------------------------------------
+
 name: Deploy DAMAP
 
 on:
-  push: {}
-  workflow_dispatch: {}
+  push: {}               # Run on every push
+  workflow_dispatch: {}  # Allow manual runs from GitHub UI
 
+# Prevent overlapping runs for the same branch environment
+concurrency:
+  group: damap-${{ github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   build:
     name: Build DAMAP
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name }}
+    environment: ${{ github.ref_name }}  # Attach environment per branch for secrets/vars scoping
+    permissions:
+      contents: read    # Required for actions/checkout
+      packages: write   # Required to push to GHCR
+    outputs:
+      tag: ${{ steps.compute_tag.outputs.TAG }}                               # Export computed TAG for downstream jobs
+      image: ghcr.io/${{ github.repository }}/damap-backend                   # Export image name (optional convenience)
     steps:
-    - name: Get environment from git ref
-      id: get_environment_from_git_ref
-      run: "echo \"Running on branch ${{ github.ref_name }}\"\nif [ \"${{ github.ref }}\" = \"refs/heads/main\" ]; then\n  echo \"environment=main\"\n  echo \"environment=main\" >> $GITHUB_OUTPUT\n  echo \"environment_short=main\" >> $GITHUB_OUTPUT\nelse\n  echo \"environment=${{ github.ref_name }}\"\n  echo \"environment=${{ github.ref_name }}\" >> $GITHUB_OUTPUT\n  echo \"environment_short=$(echo -n ${{ github.ref_name }} | sed 's/feat\\(ure\\)\\{0,1\\}[_/]//' | tr '_' '-' | tr '[:upper:]' '[:lower:]' )\" >> $GITHUB_OUTPUT\nfi    \n"
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    - name: Login to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-    - name: Create tags based on git data
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: |
-          ghcr.io/${{ github.repository }}/damap-backend
-        tags: latest
-    - name: Create build environment
-      env:
-        VARS_CONTEXT: ${{ toJson(vars) }}
-      run: |
-        git clone --depth 1 --branch ${{ vars.DAMAP_BE_TAG }} https://github.com/damap-org/damap-backend.git
-        sed -i -e "s|env: DEV|env: PROD|g" damap-backend/src/main/resources/application.yaml
-        sed -i -e "s|origins: http://localhost:8085|origins: ${{ vars.DAMAP_BE_ORIGINS }}|g" damap-backend/src/main/resources/application.yaml
-        sed -i -e "s|url: http://keycloak:8080/realms/damap|url: ${{ vars.DAMAP_BE_URL }}|g" damap-backend/src/main/resources/application.yaml
-        sed -i -e "s|url: http://localhost:8087/realms/damap|url: ${{ vars.DAMAP_BE_URL }}|g" damap-backend/src/main/resources/application.yaml
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    - name: Build and push
-      uses: docker/build-push-action@v5
-      with:
-        context: damap-backend/.
-        platforms: linux/amd64
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+      # Checkout the repository (fetch-depth 0 is useful if you later need tags/annotations)
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Compute the TAG to use for:
+      # - git clone of damap-backend
+      # - docker image tag
+      # - sed replacement in Kubernetes manifests
+      # Priority: vars.DAMAP_BE_TAG -> branch name -> 'latest'
+      - name: Compute TAG
+        id: compute_tag
+        shell: bash
+        run: |
+          if [[ -n "${{ vars.DAMAP_BE_TAG }}" ]]; then
+            TAG="${{ vars.DAMAP_BE_TAG }}"
+          else
+            RAW="${{ github.ref_name }}"
+            # Normalize branch name (strip 'feature/', convert to lowercase, replace underscores)
+            TAG="$(echo -n "$RAW" \
+                | sed 's#^refs/heads/##' \
+                | sed 's#^refs/tags/##' \
+                | sed 's#feat\\(ure\\)\\{0,1\\}[_/]##' \
+                | tr '_' '-' \
+                | tr '[:upper:]' '[:lower:]')"
+            [[ -z "$TAG" ]] && TAG="latest"
+          fi
+          echo "TAG=$TAG"
+          echo "TAG=$TAG" >> "$GITHUB_OUTPUT"
+
+      # Docker Buildx: enables advanced builds and cache sharing
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Login to GitHub Container Registry (GHCR)
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Prepare the backend codebase from damap-org/damap-backend at the computed TAG/branch
+      # and patch application.yaml with environment‑specific values from repo variables.
+      - name: Create build environment (checkout damap-backend by TAG)
+        env:
+          TAG: ${{ steps.compute_tag.outputs.TAG }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch "$TAG" https://github.com/damap-org/damap-backend.git
+          # Switch to PROD and override CORS/origins and Keycloak URLs based on repository variables
+          sed -i -e 's|env: DEV|env: PROD|g' damap-backend/src/main/resources/application.yaml
+          sed -i -e "s|origins: http://localhost:8085|origins: ${{ vars.DAMAP_BE_ORIGINS }}|g" damap-backend/src/main/resources/application.yaml
+          sed -i -e "s|url: http://keycloak:8080/realms/damap|url: ${{ vars.DAMAP_BE_URL }}|g" damap-backend/src/main/resources/application.yaml
+          sed -i -e "s|url: http://localhost:8087/realms/damap|url: ${{ vars.DAMAP_BE_URL }}|g" damap-backend/src/main/resources/application.yaml
+
+      # Optional OCI metadata (labels) for traceability in GHCR
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/damap-backend
+          tags: |
+            type=raw,value=${{ steps.compute_tag.outputs.TAG }}
+          labels: |
+            org.opencontainers.image.title=DAMAP Backend
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.run_id }}
+
+      # Build and push the backend image to GHCR with the computed TAG
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: damap-backend/.
+          platforms: linux/amd64           # Add linux/arm64 and QEMU if you need multi-arch
+          push: true
+          tags: ghcr.io/${{ github.repository }}/damap-backend:${{ steps.compute_tag.outputs.TAG }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   deploy:
+    name: Deploy to Kubernetes
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build]                         # Wait for build job to finish
     environment: ${{ github.ref_name }}
+    permissions:
+      contents: read                       # Required for actions/checkout
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-    - name: Kubernetes credentials
-      run: |
-        mkdir ${HOME}/.kube
-        echo ${{ secrets.C2_KUBE_CONFIG }} | base64 --decode > ${HOME}/.kube/config
-        chmod 0600 ${HOME}/.kube/config
-        KUBE_NAMESPACE="${{ secrets.KUBE_NAMESPACE }}"
-        echo "KUBE_NAMESPACE=$KUBE_NAMESPACE" >> $GITHUB_ENV
-        kubectl config set-context --current --namespace=${{ secrets.KUBE_NAMESPACE }}
-        kubectl get pod
-    - name: Set environment variables
-      env:
-        SECRETS_CONTEXT: ${{ toJson(secrets) }}
-        VARS_CONTEXT: ${{ toJson(vars) }}
-      run: |
-        cat > secrets.yaml <<EOF
-        apiVersion: v1
-        kind: Secret
-        metadata:
+      # Checkout manifests and configuration files (include submodules if used)
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Configure Kubernetes access using kubeconfig from secret.
+      # Namespace is taken from repository variable KUBE_NAMESPACE if available, otherwise from secret.
+      - name: Kubernetes credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${HOME}/.kube"
+          echo "${{ secrets.C2_KUBE_CONFIG }}" | base64 --decode > "${HOME}/.kube/config"
+          chmod 0600 "${HOME}/.kube/config"
+
+          KNS="${{ vars.KUBE_NAMESPACE }}"
+          if [[ -z "$KNS" ]]; then
+            KNS="${{ secrets.KUBE_NAMESPACE }}"
+          fi
+          if [[ -z "$KNS" ]]; then
+            echo "KUBE_NAMESPACE is not defined (vars or secrets). Exiting." >&2
+            exit 1
+          fi
+          echo "KUBE_NAMESPACE=$KNS" >> "$GITHUB_ENV"
+          kubectl config set-context --current --namespace="$KNS"
+          kubectl get pod -n "$KNS" || true
+
+      # Build a Kubernetes Secret manifest from all repository secrets prefixed with K8S_SECRET_
+      # and apply it to the target namespace.
+      - name: Apply Secrets (from repository secrets)
+        env:
+          SECRETS_CONTEXT: ${{ toJson(secrets) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "apiVersion: v1
+          kind: Secret
+          metadata:
             name: ${{ github.ref_name }}
-        type: Opaque
-        data:
-        EOF
-        k8s_secrets=$(echo -n "$SECRETS_CONTEXT" | jq -r '[to_entries[]|select(.key|startswith("K8S_SECRET_"))]|map("  \(.key|sub("K8S_SECRET_"; "")): \(.value|tostring|@base64)")|.[]')
-        if [ "$k8s_secrets"x == 'x' ]
-        then echo ' {}' >> secrets.yaml
-        else echo "$k8s_secrets" >> secrets.yaml
-        fi
-        kubectl replace -f secrets.yaml -n "${{ vars.KUBE_NAMESPACE }}" --force
-        rm secrets.yaml
-    - name: Clean
-      run: |
-        echo "Delete previous ConfigMaps"
-        kubectl -n damap delete configmap api-mock-config
-        kubectl -n damap delete configmap nginx-config
-    - name: Deploy
-      env:
-        SECRETS_CONTEXT: ${{ toJson(secrets) }}
-        VARS_CONTEXT: ${{ toJson(vars) }}
-      run: |
-        echo "Create ConfigMaps from the configuration files"
-        kubectl -n damap create configmap api-mock-config --from-file=./config/api-mock/data/
-        kubectl -n damap create configmap nginx-config --from-file=./config/nginx.conf       
-        echo "Introduce env variable related to the branch ${{ github.ref_name }}"     
-        sed -i -e "s|damap_be_service_id|${{ vars.DAMAP_BE_SERVICE_ID }}|g" Kubernetes/damap-be.yaml
-        sed -i -e "s|damap_fe_service_id|${{ vars.DAMAP_FE_SERVICE_ID }}|g" Kubernetes/damap-fe.yaml
-        sed -i -e "s|proxy_public_url|${{ secrets.K8S_SECRET_PUBLIC_URL }}|g" Kubernetes/proxy.yaml
-        sed -i -e "s|proxy_service_id|${{ vars.PROXY_SERVICE_ID }}|g" Kubernetes/proxy.yaml
-        sed -i -e "s|https://||g" Kubernetes/proxy.yaml
-        sed -i -e "s|api_mock_service_id|${{ vars.API_MOCK_SERVICE_ID }}|g" Kubernetes/api-mock.yaml
-        sed -i -e "s|fits_service_service_id|${{ vars.FITS_SERVICE_ID }}|g" Kubernetes/fits-service.yaml
-        sed -i -e "s|keycloak_service_service_id|${{ vars.KEYCLOAK_SERVICE_ID }}|g" Kubernetes/keycloak.yaml
-        sed -i -e "s|keycloak_db_service_service_id|${{ vars.KEYCLOAK_DB_SERVICE_ID }}|g" Kubernetes/keycloak-db.yaml
-        sed -i -e "s|damap_db_service_service_id|${{ vars.DAMAP_DB_SERVICE_ID }}|g" Kubernetes/damap-db.yaml
-        sed -i -e "s|damap_be_secrets|main|g" Kubernetes/damap-be.yaml
-        echo "Deploying from the branch ${{ github.ref_name }}" 
-        kubectl -n "${{ vars.KUBE_NAMESPACE }}" apply -f Kubernetes/
+          type: Opaque
+          data:" > secrets.yaml
+
+          echo "$SECRETS_CONTEXT" \
+          | jq -r '[to_entries[] | select(.key | startswith("K8S_SECRET_"))]
+                    | map("  \(.key | sub(\"K8S_SECRET_\"; \"\")): \(.value | tostring | @base64)")
+                    | .[]' >> secrets.yaml
+
+          # If no K8S_SECRET_* entries exist, keep YAML valid with an empty map
+          if ! grep -q '  ' secrets.yaml; then
+            echo '  {}' >> secrets.yaml
+          fi
+
+          kubectl apply -f secrets.yaml -n "$KUBE_NAMESPACE"
+          rm -f secrets.yaml
+
+      # Clean old ConfigMaps (ignore if they do not exist)
+      - name: Clean old ConfigMaps (idempotent)
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl -n "$KUBE_NAMESPACE" delete configmap api-mock-config --ignore-not-found=true
+          kubectl -n "$KUBE_NAMESPACE" delete configmap nginx-config   --ignore-not-found=true
+
+      # Recreate ConfigMaps from local files
+      - name: Create ConfigMaps from files
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl -n "$KUBE_NAMESPACE" create configmap api-mock-config --from-file=./config/api-mock/data/
+          kubectl -n "$KUBE_NAMESPACE" create configmap nginx-config    --from-file=./config/nginx.conf
+
+      # Template manifests by replacing placeholders with environment-specific values.
+      # Ensures the container image tag is consistent with the built image.
+      - name: Template manifests with environment
+        env:
+          TAG: ${{ needs.build.outputs.tag }}      # Use the TAG computed in the build job
+          SECRETS_CONTEXT: ${{ toJson(secrets) }}
+          VARS_CONTEXT: ${{ toJson(vars) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Replace service IDs and URLs
+          sed -i -e "s|damap_be_service_id|${{ vars.DAMAP_BE_SERVICE_ID }}|g" Kubernetes/damap-be.yaml
+          sed -i -e "s|damap_fe_service_id|${{ vars.DAMAP_FE_SERVICE_ID }}|g" Kubernetes/damap-fe.yaml
+          sed -i -e "s|proxy_public_url|${{ secrets.K8S_SECRET_PUBLIC_URL }}|g" Kubernetes/proxy.yaml
+          sed -i -e "s|proxy_service_id|${{ vars.PROXY_SERVICE_ID }}|g" Kubernetes/proxy.yaml
+
+          # If your proxy manifest contains 'https://', this line removes it.
+          # Keep only if your Ingress/Service expects a host without scheme.
+          sed -i -e "s|https://||g" Kubernetes/proxy.yaml
+
+          sed -i -e "s|api_mock_service_id|${{ vars.API_MOCK_SERVICE_ID }}|g"     Kubernetes/api-mock.yaml
+          sed -i -e "s|fits_service_service_id|${{ vars.FITS_SERVICE_ID }}|g"     Kubernetes/fits-service.yaml
+          sed -i -e "s|keycloak_service_service_id|${{ vars.KEYCLOAK_SERVICE_ID }}|g"     Kubernetes/keycloak.yaml
+          sed -i -e "s|keycloak_db_service_service_id|${{ vars.KEYCLOAK_DB_SERVICE_ID }}|g" Kubernetes/keycloak-db.yaml
+          sed -i -e "s|damap_db_service_service_id|${{ vars.DAMAP_DB_SERVICE_ID }}|g"       Kubernetes/damap-db.yaml
+
+          # Replace the placeholder tag in both backend and frontend manifests
+          sed -i -e "s|damap_tag|${TAG}|g" Kubernetes/damap-be.yaml
+          sed -i -e "s|damap_tag|${TAG}|g" Kubernetes/damap-fe.yaml
+
+      # Apply all manifests in the Kubernetes/ directory to the target namespace
+      - name: Deploy manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Deploying to namespace: $KUBE_NAMESPACE  (tag: ${{ needs.build.outputs.tag }})"
