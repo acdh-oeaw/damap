@@ -79,13 +79,10 @@ spec:
           imagePullPolicy: IfNotPresent
           args:
             - "gotenberg"
-            - "--chromium-disable-javascript=true"
-            - "--chromium-disable-gpu=true"
-            - "--libreoffice-auto-start=true"
-            - "--log-level=info"
-            - "--read-timeout=30s"
-            - "--write-timeout=300s"
-            - "--graceful-shutdown-duration=10s"
+            - "--api-port=3000"
+            - "--api-start-timeout=30s"
+            - "--libreoffice-auto-start"
+            - "--chromium-auto-start"
           ports:
             - containerPort: 3000
               name: gotenberg
