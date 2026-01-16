@@ -41,6 +41,9 @@ spec:
         envFrom:
         - secretRef:
             name: damap_be_secrets
+        env:
+          - name: DAMAP_GOTENBERG_URL
+          value: "http://gotenberg:3000"
         readinessProbe:
           httpGet:
             path: /q/health/live
