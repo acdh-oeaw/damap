@@ -1,0 +1,55 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gotenberg
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gotenberg
+  template:
+    metadata:
+      labels:
+        app: gotenberg
+    spec:
+      containers:
+      - name: gotenberg
+        image: gotenberg/gotenberg:8
+        imagePullPolicy: IfNotPresent
+        args:
+          - "gotenberg"
+          - "--api-port=3000"
+          - "--libreoffice-auto-start"
+          - "--chromium-auto-start"
+        ports:
+          - containerPort: 3000
+            name: http
+        volumeMounts:
+          - name: gotenberg-tmp
+            mountPath: /tmp
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+      volumes:
+        - name: gotenberg-tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gotenberg
+spec:
+  selector:
+    app: gotenberg
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
