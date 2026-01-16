@@ -7,11 +7,8 @@ spec:
   selector:
     app: damap-be
   ports:
-    - name: http
-      protocol: TCP
-      port: 8080
-      targetPort: 8080
-
+  - protocol: TCP
+    port: 8080
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -29,104 +26,57 @@ spec:
         ID: "damap_be_service_id"
     spec:
       containers:
-        # === 1) Glavni backend kontejner (nepromenjen, samo dopunjen env var-om) ===
-        - name: damap-be
-          image: ghcr.io/acdh-oeaw/damap/damap-backend:damap_tag
-          imagePullPolicy: Always
-          command: []
-          resources:
-            limits:
-              memory: 4096Mi
-              cpu: "2"
-          stdin: true
-          tty: true
-          ports:
-            - containerPort: 8080
-          envFrom:
-            - secretRef:
-                name: damap_be_secrets
-          env:
-            - name: DAMAP_GOTENBERG_URL
-              value: "http://localhost:3000"
-          readinessProbe:
-            httpGet:
-              path: /q/health/live
-              port: 8080
-            initialDelaySeconds: 10
-            periodSeconds: 30
-            timeoutSeconds: 15
-            failureThreshold: 5
-          livenessProbe:
-            httpGet:
-              path: /q/health/live
-              port: 8080
-            initialDelaySeconds: 10
-            periodSeconds: 30
-            timeoutSeconds: 15
-            failureThreshold: 5
-          startupProbe:
-            failureThreshold: 3
-            httpGet:
-              path: /q/health/live
-              port: 8080
-              scheme: HTTP
-            initialDelaySeconds: 60
-            periodSeconds: 10
-            successThreshold: 1
-            timeoutSeconds: 15
-        - name: gotenberg
-          image: gotenberg/gotenberg:8 
-          imagePullPolicy: IfNotPresent
-          args:
-            - "gotenberg"
-            - "--api-port=3000"
-            - "--api-start-timeout=30s"
-            - "--libreoffice-auto-start"
-            - "--chromium-auto-start"
-          ports:
-            - containerPort: 3000
-              name: gotenberg
-              protocol: TCP
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "256Mi"
-            limits:
-              cpu: "1000m"
-              memory: "1024Mi"
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 3000
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            timeoutSeconds: 3
-            failureThreshold: 6
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 3000
-            initialDelaySeconds: 10
-            periodSeconds: 20
-            timeoutSeconds: 3
-            failureThreshold: 6
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            runAsNonRoot: true
-            runAsUser: 10001
-            capabilities:
-              drop: ["ALL"]
+      - name: damap-be
+        image: ghcr.io/acdh-oeaw/damap/damap-backend:damap_tag
+        imagePullPolicy: Always
+        command: []
+        resources:
+          limits:
+            memory: 4096Mi
+            cpu: "2"
+        stdin: true
+        tty: true
+        ports:
+        - containerPort: 8080
+        envFrom:
+        - secretRef:
+            name: damap_be_secrets
+        readinessProbe:
+          httpGet:
+            path: /q/health/live
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 15
+          failureThreshold: 5
+        livenessProbe:
+          httpGet:
+            path: /q/health/live
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 15
+          failureThreshold: 5
+        startupProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /q/health/live
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 15
       initContainers:
-        - name: damap-db
-          image: busybox
-          command: ['sh', '-c', 'until nslookup damap-db.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for damap-db; sleep 2; done;']
-        - name: keycloak
-          image: busybox
-          command: ['sh', '-c', 'until nslookup keycloak.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for keycloak; sleep 2; done;']
-        - name: api-mock
-          image: busybox
-          command: ['sh', '-c', 'until nslookup api-mock.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for api-mock; sleep 2; done;']
-        - name: fits-service
-          image: busybox
-          command: ['sh', '-c', 'until nslookup fits-service.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for fits-service; sleep 2; done;']
+      - name: damap-db
+        image: busybox
+        command: ['sh', '-c', 'until nslookup damap-db.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for damap-db; sleep 2; done;']
+      - name: keycloak
+        image: busybox
+        command: ['sh', '-c', 'until nslookup keycloak.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for keycloak; sleep 2; done;']
+      - name: api-mock
+        image: busybox
+        command: ['sh', '-c', 'until nslookup api-mock.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for api-mock; sleep 2; done;']
+      - name: fits-service
+        image: busybox
+        command: ['sh', '-c', 'until nslookup fits-service.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for fits-service; sleep 2; done;']
