@@ -12,6 +12,7 @@ spec:
     metadata:
       labels:
         app: gotenberg
+        ID: "gotenberg_service_id"
     spec:
       containers:
       - name: gotenberg

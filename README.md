@@ -17,6 +17,7 @@ Environment variables needed for the DAMAP stack:
 |KEYCLOAK_SERVICE_ID|:white_check_mark:|Variable|Env|A K8s label ID is attached to the workload/deployment with this value (usually a number) |
 |KEYCLOAK_DB_SERVICE_ID|:white_check_mark:|Variable|Env|A K8s label ID is attached to the workload/deployment with this value (usually a number) |
 |DAMAP_DB_SERVICE_ID|:white_check_mark:|Variable|Env|A K8s label ID is attached to the workload/deployment with this value (usually a number) |
+|GOTENBERG_SERVICE_ID|:white_check_mark:|Variable|Env|A K8s label ID is attached to the workload/deployment with this value (usually a number) |
 |K8S_SECRET_PUBLIC_URL|:white_check_mark:|Variable|Env|The URI with https:// that should be configured for access to the service. |
 |K8S_SECRET_JAVA_OPTS|:white_check_mark:|Secret|Env|Variables based on https://github.com/tuwien-csd/damap-backend/blob/next/src/main/resources/application.yaml. |
 |DAMAP_BE_ORIGINS|:white_check_mark:|Variable|Env|Origins variables based on https://github.com/tuwien-csd/damap-backend/blob/next/src/main/resources/application.yaml. |

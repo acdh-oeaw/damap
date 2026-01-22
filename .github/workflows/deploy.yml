@@ -232,6 +232,7 @@ jobs:
           sed -i -e "s|keycloak_service_service_id|${{ vars.KEYCLOAK_SERVICE_ID }}|g"     Kubernetes/keycloak.yaml
           sed -i -e "s|keycloak_db_service_service_id|${{ vars.KEYCLOAK_DB_SERVICE_ID }}|g" Kubernetes/keycloak-db.yaml
           sed -i -e "s|damap_db_service_service_id|${{ vars.DAMAP_DB_SERVICE_ID }}|g"       Kubernetes/damap-db.yaml
+          sed -i -e "s|gotenberg_service_id|${{ vars.GOTENBERG_SERVICE_ID }}|g"       Kubernetes/gotenberg.yaml
 
           # Replace the placeholder tag in both backend and frontend manifests
           sed -i -e "s|damap_tag|${TAG}|g" Kubernetes/damap-be.yaml
